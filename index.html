@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to Webhook</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 30px;
+            color: #7c8aff;
+        }
+        .upload-area {
+            width: 100%;
+            max-width: 600px;
+            border: 2px dashed #3a3a5c;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s, background 0.3s;
+            background: #1a1a2e;
+            position: relative;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #7c8aff;
+            background: #1f1f35;
+        }
+        .upload-area input[type="file"] {
+            display: none;
+        }
+        .upload-area .icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+        .upload-area p {
+            color: #888;
+            font-size: 0.95rem;
+        }
+        .preview-container {
+            margin-top: 16px;
+        }
+        .preview-container img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            border: 1px solid #3a3a5c;
+        }
+        .btn {
+            margin-top: 20px;
+            padding: 12px 36px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: #7c8aff;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .btn:hover { background: #6570e0; }
+        .btn:active { transform: scale(0.97); }
+        .btn:disabled {
+            background: #3a3a5c;
+            cursor: not-allowed;
+        }
+        .spinner {
+            display: none;
+            margin: 20px auto;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #3a3a5c;
+            border-top-color: #7c8aff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .result-section {
+            width: 100%;
+            max-width: 800px;
+            margin-top: 30px;
+            display: none;
+        }
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #3a3a5c;
+        }
+        .tab-btn {
+            padding: 10px 28px;
+            font-size: 0.95rem;
+            border: none;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .tab-btn.active {
+            color: #7c8aff;
+            border-bottom-color: #7c8aff;
+        }
+        .tab-btn:hover { color: #bbb; }
+        .tab-content {
+            background: #1a1a2e;
+            border-radius: 0 0 12px 12px;
+            padding: 20px;
+            min-height: 200px;
+            max-height: 500px;
+            overflow: auto;
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* Raw JSON */
+        .raw-json {
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #c5c8ff;
+            line-height: 1.6;
+        }
+
+        /* AI Results */
+        .ai-card {
+            background: #22223a;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            border-left: 4px solid #7c8aff;
+        }
+        .ai-card .ai-name {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #7c8aff;
+            margin-bottom: 6px;
+            text-transform: capitalize;
+        }
+        .ai-card .ai-value {
+            font-size: 0.9rem;
+            color: #ccc;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.5;
+        }
+
+        .error-msg {
+            color: #ff6b6b;
+            margin-top: 16px;
+            text-align: center;
+        }
+
+        .source-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .source-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 0.95rem;
+            border: 2px solid #3a3a5c;
+            border-radius: 10px;
+            background: #1a1a2e;
+            color: #ccc;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .source-btn:hover { border-color: #7c8aff; color: #fff; }
+        .source-btn.active {
+            border-color: #7c8aff;
+            background: #22223a;
+            color: #7c8aff;
+        }
+        .camera-section {
+            width: 100%;
+            max-width: 600px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 20px;
+            border: 2px solid #3a3a5c;
+        }
+        .camera-section video {
+            width: 100%;
+            max-height: 350px;
+            border-radius: 10px;
+            background: #000;
+        }
+        .camera-section canvas { display: none; }
+        .camera-btn {
+            margin-top: 14px;
+            padding: 10px 30px;
+            font-size: 0.95rem;
+            border: none;
+            border-radius: 8px;
+            background: #7c8aff;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .camera-btn:hover { background: #6570e0; }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 600px) {
+            body { padding: 20px 10px; }
+            h1 { font-size: 1.3rem; margin-bottom: 18px; }
+            .source-buttons { gap: 8px; }
+            .source-btn { padding: 10px 6px; font-size: 0.82rem; }
+            .upload-area { padding: 24px 14px; border-radius: 12px; }
+            .upload-area .icon { font-size: 2.2rem; margin-bottom: 8px; }
+            .upload-area p { font-size: 0.82rem; }
+            .preview-container img { max-height: 150px; }
+            .camera-section { padding: 14px; border-radius: 12px; }
+            .camera-section video { max-height: 260px; }
+            .camera-btn { padding: 10px 20px; font-size: 0.85rem; }
+            .btn { padding: 10px 24px; font-size: 0.9rem; }
+            .result-section { margin-top: 20px; }
+            .tabs { flex-wrap: nowrap; }
+            .tab-btn { padding: 8px 14px; font-size: 0.82rem; flex: 1; text-align: center; }
+            .tab-content { padding: 14px; max-height: 400px; }
+            .raw-json { font-size: 0.75rem; }
+            .ai-card { padding: 12px 14px; }
+            .ai-card .ai-name { font-size: 0.9rem; }
+            .ai-card .ai-value { font-size: 0.82rem; }
+        }
+
+        @media (max-width: 380px) {
+            h1 { font-size: 1.1rem; }
+            .source-btn { font-size: 0.75rem; padding: 8px 4px; }
+            .upload-area { padding: 18px 10px; }
+            .tab-btn { padding: 6px 8px; font-size: 0.75rem; }
+            .btn { padding: 10px 18px; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🔍 Image Analyzer</h1>
+
+    <div class="source-buttons">
+        <button class="source-btn active" id="btnDevice">📁 From Device</button>
+        <button class="source-btn" id="btnCamera">📷 From Camera</button>
+    </div>
+
+    <div class="upload-area" id="uploadArea">
+        <div class="icon">📁</div>
+        <p>Drag & drop an image here or click to browse</p>
+        <input type="file" id="fileInput" accept="image/*">
+        <div class="preview-container" id="previewContainer"></div>
+    </div>
+
+    <div class="camera-section" id="cameraSection">
+        <video id="cameraVideo" autoplay playsinline></video>
+        <canvas id="cameraCanvas"></canvas>
+        <button class="camera-btn" id="captureBtn">📸 Capture Photo</button>
+        <div class="preview-container" id="cameraPreview" style="margin-top:14px;"></div>
+    </div>
+
+    <button class="btn" id="sendBtn" disabled>Send to Webhook</button>
+    <div class="spinner" id="spinner"></div>
+    <p class="error-msg" id="errorMsg"></p>
+
+    <div class="result-section" id="resultSection">
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="ai">AI Results</button>
+            <button class="tab-btn" data-tab="raw">Raw JSON</button>
+        </div>
+        <div class="tab-content">
+            <div class="tab-panel active" id="tab-ai"></div>
+            <div class="tab-panel" id="tab-raw"></div>
+        </div>
+    </div>
+
+    <script>
+        // ========== PASTE YOUR WEBHOOK URL HERE ==========
+        const WEBHOOK_URL = "https://n8n.srv883399.hstgr.cloud/webhook-test/3e389b43-56a1-4579-98f4-9aaa2a6c7318";
+        // =================================================
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const sendBtn = document.getElementById('sendBtn');
+        const spinner = document.getElementById('spinner');
+        const errorMsg = document.getElementById('errorMsg');
+        const resultSection = document.getElementById('resultSection');
+
+        let selectedFile = null;
+        let cameraStream = null;
+
+        const btnDevice = document.getElementById('btnDevice');
+        const btnCamera = document.getElementById('btnCamera');
+        const cameraSection = document.getElementById('cameraSection');
+        const cameraVideo = document.getElementById('cameraVideo');
+        const cameraCanvas = document.getElementById('cameraCanvas');
+        const captureBtn = document.getElementById('captureBtn');
+        const cameraPreview = document.getElementById('cameraPreview');
+
+        // Source toggle
+        btnDevice.addEventListener('click', () => {
+            btnDevice.classList.add('active');
+            btnCamera.classList.remove('active');
+            uploadArea.style.display = 'block';
+            cameraSection.style.display = 'none';
+            stopCamera();
+        });
+
+        btnCamera.addEventListener('click', async () => {
+            btnCamera.classList.add('active');
+            btnDevice.classList.remove('active');
+            uploadArea.style.display = 'none';
+            cameraSection.style.display = 'flex';
+            await startCamera();
+        });
+
+        async function startCamera() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
+                cameraVideo.srcObject = cameraStream;
+            } catch (err) {
+                showError('Camera access denied or not available.');
+            }
+        }
+
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null;
+                cameraVideo.srcObject = null;
+            }
+        }
+
+        captureBtn.addEventListener('click', () => {
+            if (!cameraStream) return;
+            cameraCanvas.width = cameraVideo.videoWidth;
+            cameraCanvas.height = cameraVideo.videoHeight;
+            cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0);
+            cameraCanvas.toBlob(blob => {
+                selectedFile = new File([blob], 'camera-capture.png', { type: 'image/png' });
+                cameraPreview.innerHTML = `<img src="${cameraCanvas.toDataURL()}" alt="Captured">`;
+                sendBtn.disabled = false;
+                errorMsg.textContent = '';
+            }, 'image/png');
+        });
+
+        // Click to browse
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // Drag & drop
+        uploadArea.addEventListener('dragover', e => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) handleFile(fileInput.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('Please select a valid image file.');
+                return;
+            }
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = e => {
+                previewContainer.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+            };
+            reader.readAsDataURL(file);
+            sendBtn.disabled = false;
+            errorMsg.textContent = '';
+        }
+
+        // Send
+        sendBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            sendBtn.disabled = true;
+            spinner.style.display = 'block';
+            errorMsg.textContent = '';
+            resultSection.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+
+                const res = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await res.json();
+                displayResults(data);
+            } catch (err) {
+                showError('Error: ' + err.message);
+            } finally {
+                spinner.style.display = 'none';
+                sendBtn.disabled = false;
+            }
+        });
+
+        function displayResults(data) {
+            resultSection.style.display = 'block';
+
+            // Raw JSON tab
+            document.getElementById('tab-raw').innerHTML =
+                `<pre class="raw-json">${JSON.stringify(data, null, 2)}</pre>`;
+
+            // AI Results tab
+            const aiTab = document.getElementById('tab-ai');
+            aiTab.innerHTML = '';
+
+            // Flatten and render all key-value pairs
+            const entries = flattenObject(data);
+            if (Object.keys(entries).length === 0) {
+                aiTab.innerHTML = '<p style="color:#888;">No data returned.</p>';
+                return;
+            }
+
+            for (const [key, value] of Object.entries(entries)) {
+                const card = document.createElement('div');
+                card.className = 'ai-card';
+                card.innerHTML = `
+                    <div class="ai-name">${escapeHtml(key)}</div>
+                    <div class="ai-value">${escapeHtml(String(value))}</div>
+                `;
+                aiTab.appendChild(card);
+            }
+
+            resultSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Flatten nested objects into dot-notation keys
+        function flattenObject(obj, prefix = '') {
+            const result = {};
+            for (const [key, value] of Object.entries(obj)) {
+                const fullKey = prefix ? `${prefix}.${key}` : key;
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    Object.assign(result, flattenObject(value, fullKey));
+                } else {
+                    result[fullKey] = value;
+                }
+            }
+            return result;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showError(msg) {
+            errorMsg.textContent = msg;
+        }
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
